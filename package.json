@@ -1,0 +1,50 @@
+{
+  "name": "camino-backend",
+  "version": "1.0.0",
+  "description": "Camino Travel Platform - Backend API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest",
+    "test:api": "jest --runInBand",
+    "seed": "node src/database/seeders/runSeeders.js",
+    "fix-passwords": "node src/database/fixAdminPassword.js",
+    "migrate": "node src/database/migrations/runMigrations.js",
+    "migrate:languages": "node database/add_language_fields_safe.js",
+    "clear-and-reseed": "node database/clear_and_reseed.js"
+  },
+  "keywords": [
+    "travel",
+    "api",
+    "backend",
+    "express",
+    "mysql"
+  ],
+  "author": "Camino Team",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.9.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.5",
+    "nodemailer": "^7.0.13",
+    "sequelize": "^6.35.2",
+    "slugify": "^1.6.6"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.3"
+  }
+}
