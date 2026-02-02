@@ -23,9 +23,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parsing: 1MB in production to avoid OOM on small servers; 10MB in dev for uploads
+const bodyLimit = process.env.BODY_LIMIT || (process.env.NODE_ENV === 'production' ? '1mb' : '10mb');
+app.use(express.json({ limit: bodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
@@ -88,13 +89,15 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Error handling middleware (must be last)
+// Error handling middleware (must be last). In production log only message to avoid large objects.
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Error:', err);
+  } else {
+    console.error('Error:', err?.message || String(err));
+  }
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
-  
   res.status(statusCode).json({
     success: false,
     error: {

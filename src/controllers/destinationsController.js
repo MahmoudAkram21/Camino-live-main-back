@@ -20,6 +20,7 @@ const getAllDestinations = async (req, res) => {
       where,
       include: [{ model: models.Country, as: 'country', attributes: ['id', 'name', 'code'] }],
       order: [['display_order', 'ASC'], ['name', 'ASC']],
+      limit: 200,
     });
 
     // Get locale and transform fields

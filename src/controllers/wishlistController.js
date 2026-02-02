@@ -195,9 +195,9 @@ const getWishlist = async (req, res) => {
           include: [
             { model: models.Country, as: 'country', attributes: ['id', 'name', 'code'] },
             { model: models.Collection, as: 'collection', attributes: ['id', 'slug', 'title'] },
-            { 
-              model: models.TripImage, 
-              as: 'images', 
+            {
+              model: models.TripImage,
+              as: 'images',
               attributes: ['id', 'image_url', 'image_alt', 'display_order', 'is_hero'],
               order: [['display_order', 'ASC']],
               limit: 1,
@@ -206,6 +206,7 @@ const getWishlist = async (req, res) => {
         },
       ],
       order: [['created_at', 'DESC']],
+      limit: 100,
     });
 
     res.json({

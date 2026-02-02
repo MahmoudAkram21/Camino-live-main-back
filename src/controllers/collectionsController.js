@@ -27,6 +27,7 @@ const getAllCollections = async (req, res) => {
         limit: 6,
       }],
       order: [['display_order', 'ASC']],
+      limit: 100,
     });
 
     // Get locale and transform fields

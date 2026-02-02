@@ -12,6 +12,7 @@ const getAllFAQs = async (req, res) => {
     const faqs = await models.FAQ.findAll({
       where,
       order: [['display_order', 'ASC'], ['category', 'ASC']],
+      limit: 200,
     });
 
     // Get locale and transform fields
@@ -35,6 +36,7 @@ const getCategories = async (req, res) => {
       where: { is_active: true, category: { [Op.ne]: null } },
       group: ['category'],
       raw: true,
+      limit: 50,
     });
 
     const uniqueCategories = [...new Set(categories.map(c => c.category))];

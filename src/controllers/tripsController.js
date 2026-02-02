@@ -2,6 +2,8 @@ const models = require('../models');
 const { Op } = require('sequelize');
 const { getLocaleFromRequest, transformLocalizedFields } = require('../utils/localeHelper');
 
+const MAX_PAGE_LIMIT = 50;
+
 const getAllTrips = async (req, res) => {
   try {
     const {
@@ -18,6 +20,8 @@ const getAllTrips = async (req, res) => {
       trending,
       search,
     } = req.query;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), MAX_PAGE_LIMIT);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
 
     const where = { is_active: true };
 
@@ -61,7 +65,7 @@ const getAllTrips = async (req, res) => {
       }
     }
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (safePage - 1) * safeLimit;
 
     const { count, rows } = await models.Trip.findAndCountAll({
       where,
@@ -71,7 +75,7 @@ const getAllTrips = async (req, res) => {
         { model: models.TripImage, as: 'images', attributes: ['id', 'image_url', 'image_alt', 'display_order'], limit: 5 },
       ],
       order: [['display_order', 'ASC'], ['created_at', 'DESC']],
-      limit: parseInt(limit),
+      limit: safeLimit,
       offset,
     });
 
@@ -90,9 +94,9 @@ const getAllTrips = async (req, res) => {
       data: transformedRows,
       pagination: {
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(count / parseInt(limit)),
+        page: safePage,
+        limit: safeLimit,
+        pages: Math.ceil(count / safeLimit),
       },
     });
   } catch (error) {

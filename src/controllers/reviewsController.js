@@ -1,9 +1,13 @@
 const models = require('../models');
 
+const MAX_PAGE_LIMIT = 50;
+
 const getAllReviews = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), MAX_PAGE_LIMIT);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const offset = (safePage - 1) * safeLimit;
 
     const { count, rows } = await models.Review.findAndCountAll({
       where: { is_approved: true },
@@ -11,7 +15,7 @@ const getAllReviews = async (req, res) => {
         { model: models.Trip, as: 'trip', attributes: ['id', 'slug', 'title'], required: false },
       ],
       order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
+      limit: safeLimit,
       offset,
     });
 
@@ -20,9 +24,9 @@ const getAllReviews = async (req, res) => {
       data: rows,
       pagination: {
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(count / parseInt(limit)),
+        page: safePage,
+        limit: safeLimit,
+        pages: Math.ceil(count / safeLimit),
       },
     });
   } catch (error) {

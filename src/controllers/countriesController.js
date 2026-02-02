@@ -5,6 +5,7 @@ const getAllCountries = async (req, res) => {
     const countries = await models.Country.findAll({
       where: { is_active: true },
       order: [['display_order', 'ASC'], ['name', 'ASC']],
+      limit: 500,
     });
 
     res.json({ success: true, data: countries });
