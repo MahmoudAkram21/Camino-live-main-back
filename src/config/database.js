@@ -9,7 +9,8 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    // Reduced logging to prevent memory issues - only log errors in development
+    logging: process.env.DB_LOGGING === 'true' ? console.log : false,
     pool: {
       min: parseInt(process.env.DB_POOL_MIN) || 2,
       max: parseInt(process.env.DB_POOL_MAX) || 10,

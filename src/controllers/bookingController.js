@@ -54,7 +54,9 @@ const createBooking = async (req, res) => {
     // Generate unique booking reference
     let bookingReference;
     let isUnique = false;
-    while (!isUnique) {
+    let attempts = 0;
+    const maxAttempts = 100; // Prevent infinite loop
+    while (!isUnique && attempts < maxAttempts) {
       bookingReference = generateBookingReference();
       const existing = await models.Booking.findOne({
         where: { booking_reference: bookingReference },
@@ -62,6 +64,13 @@ const createBooking = async (req, res) => {
       if (!existing) {
         isUnique = true;
       }
+      attempts++;
+    }
+    if (!isUnique) {
+      return res.status(500).json({
+        success: false,
+        error: { message: 'Failed to generate unique booking reference' },
+      });
     }
 
     // Create booking

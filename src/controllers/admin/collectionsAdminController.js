@@ -117,10 +117,17 @@ const createCollection = async (req, res) => {
     let slug = slugify(title, { lower: true, strict: true });
     let existingCollection = await models.Collection.findOne({ where: { slug } });
     let counter = 1;
-    while (existingCollection) {
+    const maxAttempts = 1000; // Prevent infinite loop
+    while (existingCollection && counter < maxAttempts) {
       slug = `${slugify(title, { lower: true, strict: true })}-${counter}`;
       existingCollection = await models.Collection.findOne({ where: { slug } });
       counter++;
+    }
+    if (counter >= maxAttempts) {
+      return res.status(500).json({
+        success: false,
+        error: { message: 'Failed to generate unique slug after maximum attempts' },
+      });
     }
 
     const collection = await models.Collection.create({
@@ -185,12 +192,19 @@ const updateCollection = async (req, res) => {
         where: { slug, id: { [Op.ne]: id } },
       });
       let counter = 1;
-      while (existingCollection) {
+      const maxAttempts = 1000; // Prevent infinite loop
+      while (existingCollection && counter < maxAttempts) {
         slug = `${slugify(title, { lower: true, strict: true })}-${counter}`;
         existingCollection = await models.Collection.findOne({
           where: { slug, id: { [Op.ne]: id } },
         });
         counter++;
+      }
+      if (counter >= maxAttempts) {
+        return res.status(500).json({
+          success: false,
+          error: { message: 'Failed to generate unique slug after maximum attempts' },
+        });
       }
       collection.slug = slug;
     }
