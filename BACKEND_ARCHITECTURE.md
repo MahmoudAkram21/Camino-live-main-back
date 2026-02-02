@@ -34,17 +34,16 @@
 
 ## التعديلات اللي اتعملت (الهيكلة الجديدة)
 
-### 1. تحميل الـ API routes على أول طلب (Lazy-load routes)
+### 1. تحميل الـ API routes عند التشغيل + Request timeout
 
-**التصميم الجديد:**
-- في `app.js` ما بنعملش `require('./routes/index')(app)` عند تحميل الملف.
-- بنسجّل middleware على المسار `/api`: أول ما يجي **أي طلب** على `/api/*`، الـ middleware يتأكد إن الـ routes لسه ما اتحمّلتش، يعمل `require('./routes/index')(app)` مرة واحدة ويحط علم `app._apiRoutesLoaded = true`، وبعدين يستدعي `next()` عشان الطلب يكمل لبقية الـ routes اللي اتحمّلت دلوقتي.
+**التصميم الحالي:**
+- الـ API routes بتتحمّل **من أول التشغيل** (`require('./routes/index')(app)` في `app.js`). تم إلغاء الـ lazy-load لأن "أول طلب" كان بيحمّل كل حاجة وياخد وقت طويل → **504 Gateway Timeout** من nginx، وذروة الذاكرة على أول طلب كانت ممكن توقع السيرفر.
+- تم إضافة **request timeout**: كل طلب عليه حد أقصى 25 ثانية (متغير `REQUEST_TIMEOUT_MS`). لو الطلب ما خلصش، الباك اند بيرد **503** بدل ما يعلق، فـ nginx ما يعملش 504.
 
 **النتيجة:**
-- **عند بداية التشغيل:** السيرفر بيحمّل Express + الـ middleware الخفيف (cors, helmet, morgan, rate limit, compression) + مسارات الـ health و `/` فقط. **ما بيحمّلش أي models ولا أي controllers**.
-- **أول طلب على `/api/*`:** بيتم تحميل كل الـ routes والـ controllers والـ models مرة واحدة، وبعدين كل الطلبات التالية بتستخدمهم من الذاكرة كالعادة.
-
-يعني **طريقة رسم الباك اند اتغيّرت** بحيث إن الجزء الثقيل (models + controllers) مش بيشتغل من أول الثانية، وده بيقلّل استهلاك الموارد أثناء الـ startup وبيخلي السيرفر يقدر يبدأ حتى على سيرفرات ضعيفة.
+- التشغيل بيحمّل كل الـ routes والـ models مرة واحدة عند البداية (مع تقليل الـ pool وحدود الاستعلامات وحد الـ body عشان الذاكرة تبقى تحت السيطرة).
+- مفيش طلب "أول واحد" بطيء يسبب 504.
+- أي طلب بياخد وقت طويل بياخد رد 503 قبل ما nginx يعمل 504.
 
 ---
 
@@ -58,10 +57,9 @@
 
 ---
 
-### 3. مسارات لا تحتاج تحميل الـ API
+### 3. مسارات خفيفة
 
-- **`/health`** و **`/`** مسجّلين **قبل** الـ middleware اللي بيحمّل الـ routes.
-- يعني الـ load balancer أو الـ health checks تقدر تستدعي `/health` بدون ما يتحمّل أي models أو controllers، وده جزء من **الهيكلة الصحيحة** للباك اند (خفيف عند البداية، ثقيل فقط عند الحاجة).
+- **`/health`** و **`/`** مسجّلين قبل الـ API routes، والـ load balancer أو الـ health checks تقدر تستدعي `/health` بسرعة.
 
 ---
 
@@ -69,18 +67,15 @@
 
 | الجانب | كان غلط؟ | التعديل |
 |--------|----------|---------|
-| تحميل كل الـ routes والـ models من أول التشغيل | ✅ نعم – يملأ الذاكرة من البداية | تحميل الـ API routes على أول طلب (lazy-load) |
-| حجم الـ pool والـ rate limiter واحد لكل البيئات | ✅ نعم – غير مناسب للإنتاج على سيرفر صغير | تقليل الـ pool والـ rate limit في الإنتاج |
-| عدم وجود حد لاستهلاك Node للذاكرة | ✅ نعم – يزيد احتمال سقوط السيرفر | استخدام `NODE_OPTIONS=--max-old-space-size=...` و `start:prod` (كما في DEPLOYMENT_RESOURCES.md) |
+| تحميل كل الـ routes من أول التشغيل + عدم حد للطلبات | جزئياً – أول طلب مع lazy-load كان يسبب 504 | تحميل الـ API عند التشغيل + request timeout (25 ثانية) |
+| حجم الـ pool والـ rate limiter واحد لكل البيئات | ✅ نعم | تقليل الـ pool والـ rate limit في الإنتاج |
+| عدم وجود حد لاستهلاك Node للذاكرة | ✅ نعم | استخدام `NODE_OPTIONS=--max-old-space-size=...` و `start:prod` (كما في DEPLOYMENT_RESOURCES.md) |
 
-**الخلاصة:** طريقة رسم الباك اند (تحميل كل حاجة من أول التشغيل + إعدادات ثقيلة في الإنتاج) كانت فعلاً بتساهم في المشاكل. التعديلات اللي فوق بتعدّل الهيكلة عشان الباك اند يبدأ خفيف ويحمّل الجزء الثقيل (models + controllers) فقط عند أول طلب على الـ API، مع تقليل الـ pool والـ rate limiter في الإنتاج.
+**الخلاصة:** التعديلات بتقلّل استهلاك الذاكرة (حد الـ body، حدود الاستعلامات، pool، rate limit) وبتمنع 504 عبر request timeout وتحميل الـ API من أول التشغيل.
 
 ---
 
 ## ترتيب التحميل بعد التعديل
 
-1. **Startup:** `server.js` → `app.js` → Express + middleware (بدون تحميل routes/index).
-2. **أول طلب `/api/*`:** middleware الـ lazy يحمّل `routes/index` → publicRoutes, authRoutes, adminRoutes → كل الـ controllers → `models/index` → كل الـ 16 موديل.
-3. **باقي الطلبات:** نفس الـ routes والـ models من الذاكرة، بدون تحميل جديد.
-
-لو حابب نضيف خطوة تالية (مثلاً Redis للـ rate limit أو فصل الـ admin في process منفصل)، نقدر نبني عليها من نفس الهيكلة دي.
+1. **Startup:** `server.js` → `app.js` → Express + middleware + request timeout → `require('./routes/index')(app)` → publicRoutes, authRoutes, adminRoutes → كل الـ controllers → `models/index` → كل الـ 16 موديل.
+2. **أي طلب:** الـ routes والـ models جاهزين؛ لو الطلب ياخد أكتر من 25 ثانية (أو `REQUEST_TIMEOUT_MS`) الباك اند بيرد 503.

@@ -1,6 +1,9 @@
 require('dotenv').config();
 const { Sequelize } = require('sequelize');
 
+// IMPORTANT: This app never calls sequelize.sync() or runs migrations at startup.
+// Schema must be created once in MySQL using database/schema.sql. Do not run
+// migrate/seed as part of deploy (Coolify, etc.) — run them manually when needed.
 const sequelize = new Sequelize(
   process.env.DB_NAME || 'camino_db',
   process.env.DB_USER || 'root',

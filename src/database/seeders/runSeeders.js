@@ -23,9 +23,10 @@ const runSeeders = async () => {
     await sequelize.authenticate();
     console.log('✅ Database connected\n');
 
-    // Sync models (optional - only if tables don't exist)
+    // DO NOT uncomment sync in production. Schema is created once via database/schema.sql in MySQL.
+    // sequelize.sync() would alter tables on every run and cause load/errors on deploy.
     // await sequelize.sync({ force: false, alter: true });
-    
+
     // Clear existing data (optional - uncomment if you want to reset)
     // console.log('🗑️  Clearing existing data...');
     // await clearAllData();

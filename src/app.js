@@ -61,7 +61,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes (will be added)
+// API Routes
 app.get('/', (req, res) => {
   res.json({
     message: 'Camino Travel Platform API',
@@ -79,15 +79,21 @@ app.get('/', (req, res) => {
   });
 });
 
-// Lazy-load API routes: models and controllers load on first /api request, not at startup.
-// This keeps startup memory low so the server can start on small VPS; first request pays the load cost.
-app.use('/api', (req, res, next) => {
-  if (!app._apiRoutesLoaded) {
-    require('./routes/index')(app);
-    app._apiRoutesLoaded = true;
-  }
+// Request timeout: respond before nginx 504. Default 25s (set REQUEST_TIMEOUT_MS in env).
+const requestTimeoutMs = parseInt(process.env.REQUEST_TIMEOUT_MS, 10) || 25000;
+app.use((req, res, next) => {
+  const t = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(503).json({ success: false, error: { message: 'Request timeout' } });
+    }
+  }, requestTimeoutMs);
+  res.on('finish', () => clearTimeout(t));
+  res.on('close', () => clearTimeout(t));
   next();
 });
+
+// Load API routes at startup (no lazy-load: first request was causing 504 + memory spike)
+require('./routes/index')(app);
 
 // Error handling middleware (must be last). In production log only message to avoid large objects.
 app.use((err, req, res, next) => {

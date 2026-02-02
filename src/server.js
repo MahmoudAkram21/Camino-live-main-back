@@ -2,6 +2,7 @@ require('dotenv').config();
 const app = require('./app');
 const { testConnection } = require('./config/database');
 
+// This server never runs sequelize.sync() or migrations. Schema = database/schema.sql (run once in MySQL).
 const PORT = process.env.PORT || 3000;
 const DB_CONNECT_TIMEOUT_MS = parseInt(process.env.DB_CONNECT_TIMEOUT_MS, 10) || 15000;
 

@@ -2,13 +2,33 @@
 
 > **هيكلة الباك اند:** تفاصيل الأخطاء الهيكلية اللي كانت بتسبب المشاكل والتعديلات اللي اتعملت موجودة في [BACKEND_ARCHITECTURE.md](./BACKEND_ARCHITECTURE.md).
 
+---
+
+## Schema و MySQL – مهم جداً
+
+**التطبيق لا يرسم الـ schema تلقائياً.** لا يوجد في الكود أي استدعاء لـ `sequelize.sync()` أو migrations عند التشغيل. الـ schema يُنشأ **مرة واحدة** في MySQL بتشغيل ملف `database/schema.sql`.
+
+**على Coolify (أو أي منصة deploy):**
+- **لا تضف** في Build Command أو Start Command أو Deploy Command أي من:
+  - `npm run migrate`
+  - `npm run seed`
+  - `npm run clear-and-reseed`
+  - `npm run migrate:languages`
+- **Start Command** يكون فقط: `npm start` أو `node src/server.js` (أو `npm run start:prod`).
+- **الـ schema:** شغّل `database/schema.sql` **مرة واحدة** على قاعدة MySQL (مثلاً من phpMyAdmin أو MySQL CLI).
+- **الـ seed (بيانات أولية):** لو محتاج بيانات تجريبية، شغّل `npm run seed` **يدوياً مرة واحدة** بعد تشغيل الـ schema، وليس كجزء من الـ deploy.
+
+لو كان الـ deploy بيشغّل migrate أو seed أو clear-and-reseed مع كل نشر، ده بيسبب تحميل زائد على MySQL و"رسم" متكرر للـ schema أو إعادة تعبئة البيانات في كل مرة.
+
+---
+
 ## هل طريقة بناء الباك اند هي السبب؟
 
 **جزئياً.** مفيش خطوة "build" (Webpack/Babel)، لكن **طريقة رسم الباك اند** كانت غلط من ناحية التحميل والإعدادات:
 - تحميل كل الـ routes والـ models والـ controllers **من أول التشغيل** كان بيملأ الذاكرة من البداية.
 - إعدادات الـ pool والـ rate limiter ما كانتش مناسبة لسيرفرات صغيرة في الإنتاج.
 
-تم تعديل الهيكلة (lazy-load للـ API routes + تقليل الـ pool والـ rate limit في الإنتاج). التفاصيل في [BACKEND_ARCHITECTURE.md](./BACKEND_ARCHITECTURE.md).
+تم تعديل الهيكلة (تحميل الـ routes عند التشغيل + تقليل الـ pool والـ rate limit في الإنتاج + request timeout لتفادي 504). التفاصيل في [BACKEND_ARCHITECTURE.md](./BACKEND_ARCHITECTURE.md).
 
 ---
 
@@ -93,6 +113,28 @@ NODE_OPTIONS=--max-old-space-size=384
 - **تسجيل الأخطاء في الإنتاج:** في الإنتاج بنطبع رسالة الخطأ فقط (مش الـ stack أو الـ object الكامل) عشان الـ log ما يملأش الذاكرة.
 
 لو محتاج رفع body أكبر (مثلاً للـ admin): ضع في `.env` مثلاً `BODY_LIMIT=5mb`.
+
+---
+
+## 504 Gateway Timeout (nginx)
+
+لو ظهرت **504 Gateway Time-out** من nginx، معناها إن nginx استنى رد من الباك اند ومفيش رد في الوقت المحدد (غالباً 60 ثانية). ممكن يكون السبب:
+1. طلب واحد بياخد وقت طويل (استعلام ثقيل أو أول طلب بعد التشغيل).
+2. الباك اند وقع (OOM أو crash) فـ nginx ملقاش رد.
+
+**ما تم في الباك اند:**
+- **Request timeout:** كل طلب عليه حد أقصى 25 ثانية (متغير `REQUEST_TIMEOUT_MS`). لو الطلب ما خلصش، الباك اند بيرد 503 بدل ما يعلق، فـ nginx ما يعملش 504.
+- **تحميل الـ API من أول التشغيل:** مفيش "أول طلب" بيحمّل كل حاجة وياخد وقت طويل فيسبب 504.
+
+**لو لسه 504 بيحصل:** زوّد مهلة nginx للـ proxy. في الـ server block اللي فيه الـ proxy للباك اند:
+
+```nginx
+proxy_connect_timeout 30s;
+proxy_send_timeout 60s;
+proxy_read_timeout 60s;
+```
+
+لو محتاج وقت أطول لطلبات معينة: حط في `.env` مثلاً `REQUEST_TIMEOUT_MS=60000` (60 ثانية) وزوّد `proxy_read_timeout` في nginx لـ 90 أو 120.
 
 ---
 
