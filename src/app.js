@@ -34,15 +34,14 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// Rate limiting - more lenient in development
+// Rate limiting. In production use shorter window + lower max to keep in-memory store small (or use Redis store).
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || (process.env.NODE_ENV === 'development' ? 60 * 1000 : 15 * 60 * 1000), // 1 minute in dev, 15 minutes in production
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'development' ? 1000 : 100), // 1000 requests in dev, 100 in production
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || (process.env.NODE_ENV === 'development' ? 60 * 1000 : 5 * 60 * 1000), // 1 min dev, 5 min prod (smaller store)
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'development' ? 1000 : 80),
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for localhost in development
     if (process.env.NODE_ENV === 'development') {
       const ip = req.ip || req.connection.remoteAddress;
       return ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1';
@@ -79,8 +78,15 @@ app.get('/', (req, res) => {
   });
 });
 
-// Register API routes
-require('./routes/index')(app);
+// Lazy-load API routes: models and controllers load on first /api request, not at startup.
+// This keeps startup memory low so the server can start on small VPS; first request pays the load cost.
+app.use('/api', (req, res, next) => {
+  if (!app._apiRoutesLoaded) {
+    require('./routes/index')(app);
+    app._apiRoutesLoaded = true;
+  }
+  next();
+});
 
 // Error handling middleware (must be last)
 app.use((err, req, res, next) => {

@@ -211,14 +211,10 @@ const createTrip = async (req, res) => {
     // Ensure unique slug
     let existingTrip = await models.Trip.findOne({ where: { slug }, transaction });
     let counter = 1;
-    const maxAttempts = 1000; // Prevent infinite loop
-    while (existingTrip && counter < maxAttempts) {
+    while (existingTrip) {
       slug = `${slugify(title, { lower: true, strict: true })}-${counter}`;
       existingTrip = await models.Trip.findOne({ where: { slug }, transaction });
       counter++;
-    }
-    if (counter >= maxAttempts) {
-      throw new Error('Failed to generate unique slug after maximum attempts');
     }
 
     // Create trip
@@ -416,17 +412,13 @@ const updateTrip = async (req, res) => {
         transaction,
       });
       let counter = 1;
-      const maxAttempts = 1000; // Prevent infinite loop
-      while (existingTrip && counter < maxAttempts) {
+      while (existingTrip) {
         slug = `${slugify(title, { lower: true, strict: true })}-${counter}`;
         existingTrip = await models.Trip.findOne({
           where: { slug, id: { [Op.ne]: id } },
           transaction,
         });
         counter++;
-      }
-      if (counter >= maxAttempts) {
-        throw new Error('Failed to generate unique slug after maximum attempts');
       }
       trip.slug = slug;
     }

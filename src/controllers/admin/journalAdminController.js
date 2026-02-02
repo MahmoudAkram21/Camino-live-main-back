@@ -134,17 +134,10 @@ const createArticle = async (req, res) => {
     let slug = slugify(title, { lower: true, strict: true });
     let existingArticle = await models.JournalArticle.findOne({ where: { slug } });
     let counter = 1;
-    const maxAttempts = 1000; // Prevent infinite loop
-    while (existingArticle && counter < maxAttempts) {
+    while (existingArticle) {
       slug = `${slugify(title, { lower: true, strict: true })}-${counter}`;
       existingArticle = await models.JournalArticle.findOne({ where: { slug } });
       counter++;
-    }
-    if (counter >= maxAttempts) {
-      return res.status(500).json({
-        success: false,
-        error: { message: 'Failed to generate unique slug after maximum attempts' },
-      });
     }
 
     // Get author name if author_id is provided
@@ -233,19 +226,12 @@ const updateArticle = async (req, res) => {
         where: { slug, id: { [Op.ne]: id } },
       });
       let counter = 1;
-      const maxAttempts = 1000; // Prevent infinite loop
-      while (existingArticle && counter < maxAttempts) {
+      while (existingArticle) {
         slug = `${slugify(title, { lower: true, strict: true })}-${counter}`;
         existingArticle = await models.JournalArticle.findOne({
           where: { slug, id: { [Op.ne]: id } },
         });
         counter++;
-      }
-      if (counter >= maxAttempts) {
-        return res.status(500).json({
-          success: false,
-          error: { message: 'Failed to generate unique slug after maximum attempts' },
-        });
       }
       article.slug = slug;
     }

@@ -143,17 +143,10 @@ const createDestination = async (req, res) => {
     let slug = slugify(name, { lower: true, strict: true });
     let existingDestination = await models.Destination.findOne({ where: { slug } });
     let counter = 1;
-    const maxAttempts = 1000; // Prevent infinite loop
-    while (existingDestination && counter < maxAttempts) {
+    while (existingDestination) {
       slug = `${slugify(name, { lower: true, strict: true })}-${counter}`;
       existingDestination = await models.Destination.findOne({ where: { slug } });
       counter++;
-    }
-    if (counter >= maxAttempts) {
-      return res.status(500).json({
-        success: false,
-        error: { message: 'Failed to generate unique slug after maximum attempts' },
-      });
     }
 
     const destination = await models.Destination.create({
@@ -232,19 +225,12 @@ const updateDestination = async (req, res) => {
         where: { slug, id: { [Op.ne]: id } },
       });
       let counter = 1;
-      const maxAttempts = 1000; // Prevent infinite loop
-      while (existingDestination && counter < maxAttempts) {
+      while (existingDestination) {
         slug = `${slugify(name, { lower: true, strict: true })}-${counter}`;
         existingDestination = await models.Destination.findOne({
           where: { slug, id: { [Op.ne]: id } },
         });
         counter++;
-      }
-      if (counter >= maxAttempts) {
-        return res.status(500).json({
-          success: false,
-          error: { message: 'Failed to generate unique slug after maximum attempts' },
-        });
       }
       destination.slug = slug;
     }

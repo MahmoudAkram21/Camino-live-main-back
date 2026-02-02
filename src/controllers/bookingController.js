@@ -54,9 +54,7 @@ const createBooking = async (req, res) => {
     // Generate unique booking reference
     let bookingReference;
     let isUnique = false;
-    let attempts = 0;
-    const maxAttempts = 100; // Prevent infinite loop
-    while (!isUnique && attempts < maxAttempts) {
+    while (!isUnique) {
       bookingReference = generateBookingReference();
       const existing = await models.Booking.findOne({
         where: { booking_reference: bookingReference },
@@ -64,13 +62,6 @@ const createBooking = async (req, res) => {
       if (!existing) {
         isUnique = true;
       }
-      attempts++;
-    }
-    if (!isUnique) {
-      return res.status(500).json({
-        success: false,
-        error: { message: 'Failed to generate unique booking reference' },
-      });
     }
 
     // Create booking
@@ -108,7 +99,7 @@ const createBooking = async (req, res) => {
   }
 };
 
-// Get user's bookings
+// Get user's bookings (with pagination to avoid loading too much in memory)
 const getUserBookings = async (req, res) => {
   try {
     const userId = req.userId;
@@ -119,7 +110,11 @@ const getUserBookings = async (req, res) => {
       });
     }
 
-    const bookings = await models.Booking.findAll({
+    const { page = 1, limit = 20 } = req.query;
+    const safeLimit = Math.min(parseInt(limit, 10) || 20, 100);
+    const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * safeLimit;
+
+    const { count, rows: bookings } = await models.Booking.findAndCountAll({
       where: { user_id: userId },
       include: [
         {
@@ -129,11 +124,19 @@ const getUserBookings = async (req, res) => {
         },
       ],
       order: [['created_at', 'DESC']],
+      limit: safeLimit,
+      offset,
     });
 
     res.json({
       success: true,
       data: bookings,
+      pagination: {
+        page: Math.max(parseInt(page, 10) || 1, 1),
+        limit: safeLimit,
+        total: count,
+        pages: Math.ceil(count / safeLimit),
+      },
     });
   } catch (error) {
     console.error('Error fetching user bookings:', error);
